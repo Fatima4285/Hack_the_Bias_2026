@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   Handshake,
   LifeBuoy,
+  MessageSquareHeart,
   Settings,
   Sparkles,
   User,
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { href: "/", label: "Journal", Icon: BookOpenCheck },
   { href: "/insights", label: "Insights", Icon: Sparkles },
   { href: "/connect", label: "Connect", Icon: Handshake },
+  { href: "/share", label: "Share an Experience", Icon: MessageSquareHeart}
 ];
 
 const footerItems: NavItem[] = [
