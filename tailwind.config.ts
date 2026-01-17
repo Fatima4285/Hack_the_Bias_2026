@@ -10,6 +10,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        canvas: "#FFF9F9",
+        primary: "#E29595",
+        secondary: "#FFF0F0",
+        ink: "#2D2D2D",
+        accent: "#B2AC88",
         // The core "Pink" identity
         brand: {
           light: "#FFF0F0", // Very pale for card backgrounds/hovers
@@ -26,10 +31,19 @@ const config: Config = {
           heading: "#2D2D2D", // Deep charcoal for readability
           body: "#4A4A4A", // Softer gray for long-form text
         },
-        // Accent for specific neuro-traits (e.g., "Hyperfocus" or "Success")
-        accent: {
-          sage: "#B2AC88", // Muted green that complements the pink
-        },
+      },
+      fontFamily: {
+        sans: [
+          "var(--font-inter)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Arial",
+          "Noto Sans",
+          "sans-serif",
+        ],
       },
     },
   },

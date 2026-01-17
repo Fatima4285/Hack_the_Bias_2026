@@ -1,100 +1,242 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+type SymptomKey =
+  | "executive-dysfunction"
+  | "sensory-overload"
+  | "high-masking"
+  | "social-burnout"
+  | "hyperfocus";
+
+type PhaseKey =
+  | "menstrual"
+  | "follicular"
+  | "ovulatory"
+  | "luteal"
+  | "na";
+
+const phases: { key: PhaseKey; label: string }[] = [
+  { key: "menstrual", label: "Menstrual" },
+  { key: "follicular", label: "Follicular" },
+  { key: "ovulatory", label: "Ovulatory" },
+  { key: "luteal", label: "Luteal" },
+  { key: "na", label: "N/A" },
+];
+
+export default function DailyTrackerPage() {
+  const userName = "Maya";
+  const todayLabel = useMemo(() => {
+    return new Date().toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
+
+  const [selectedSymptoms, setSelectedSymptoms] = useState<
+    Record<SymptomKey, boolean>
+  >({
+    "executive-dysfunction": false,
+    "sensory-overload": false,
+    "high-masking": false,
+    "social-burnout": false,
+    hyperfocus: false,
+  });
+
+  const [phase, setPhase] = useState<PhaseKey>("na");
+  const [notes, setNotes] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const symptomCards = useMemo(
+    () =>
+      [
+        {
+          key: "executive-dysfunction" as const,
+          title: "Executive Dysfunction",
+          helper: "Task initiation, prioritizing, switching",
+        },
+        {
+          key: "sensory-overload" as const,
+          title: "Sensory Overload",
+          helper: "Noise, lights, textures, crowded spaces",
+        },
+        {
+          key: "high-masking" as const,
+          title: "High Masking",
+          helper: "Performing ‘fine’ while feeling depleted",
+        },
+        {
+          key: "social-burnout" as const,
+          title: "Social Burnout",
+          helper: "Post-social fatigue, shutdown, avoidance",
+        },
+        {
+          key: "hyperfocus" as const,
+          title: "Hyperfocus",
+          helper: "Deep immersion; time blindness",
+        },
+      ],
+    []
+  );
+
+  function toggleSymptom(key: SymptomKey) {
+    setSelectedSymptoms((prev) => ({ ...prev, [key]: !prev[key] }));
+    setSaved(false);
+  }
+
+  function onSave() {
+    setSaved(true);
+    try {
+      localStorage.setItem(
+        "neurolens.dailyLog",
+        JSON.stringify({
+          savedAt: new Date().toISOString(),
+          phase,
+          notes,
+          symptoms: selectedSymptoms,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
+    <div className="space-y-5">
+      <header className="space-y-1">
+        <p className="text-sm text-neutral-body">{todayLabel}</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          Hi {userName} — quick check-in.
+        </h1>
+      </header>
 
-        <section className="w-full rounded-2xl border border-black/10 bg-gradient-to-r from-indigo-500/10 via-sky-500/10 to-emerald-500/10 p-5 shadow-sm dark:border-white/10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                Tailwind check
-              </p>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight text-zinc-950 dark:text-white">
-                If you see gradients, hover states, and a ring — Tailwind is on.
-              </h2>
+      <section className="space-y-3" aria-label="Symptom grid">
+        <Card>
+          <CardHeader className="flex items-end justify-between gap-3">
+            <CardTitle>Symptoms</CardTitle>
+            <p className="text-xs text-neutral-body">Tap to toggle</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3">
+              {symptomCards.map((card) => {
+                const active = selectedSymptoms[card.key];
+                return (
+                  <button
+                    key={card.key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleSymptom(card.key)}
+                    className={
+                      "w-full rounded-2xl border p-4 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60" +
+                      (active
+                        ? " border-primary bg-secondary"
+                        : " border-black/10 bg-white hover:bg-secondary")
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">
+                          {card.title}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-neutral-body">
+                          {card.helper}
+                        </p>
+                      </div>
+                      <span
+                        className={
+                          "shrink-0 rounded-full px-3 py-1 text-xs font-semibold" +
+                          (active
+                            ? " bg-primary text-white"
+                            : " bg-secondary text-ink")
+                        }
+                      >
+                        {active ? "On" : "Off"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+          </CardContent>
+        </Card>
+      </section>
 
-            <a
-              href="https://tailwindcss.com/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus:ring-offset-black"
-            >
-              Tailwind Docs
-            </a>
-          </div>
+      <section className="space-y-3" aria-label="Hormonal overlay">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Hormonal overlay</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {phases.map((p) => {
+                const active = phase === p.key;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => {
+                      setPhase(p.key);
+                      setSaved(false);
+                    }}
+                    className={
+                      "whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60" +
+                      (active
+                        ? " bg-primary text-white"
+                        : " bg-white text-ink hover:bg-secondary")
+                    }
+                    aria-pressed={active}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              hover
-            </span>
-            <span className="rounded-full bg-sky-600/10 px-3 py-1 text-xs font-medium text-sky-700 dark:text-sky-300">
-              focus ring
-            </span>
-            <span className="rounded-full bg-indigo-600/10 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300">
-              dark mode
-            </span>
-          </div>
-        </section>
-
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+      <section className="space-y-2" aria-label="Notes">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setSaved(false);
+              }}
+              rows={4}
+              placeholder="Anything you want future-you (or your clinician) to notice?"
+              className="w-full resize-none rounded-2xl border border-black/10 bg-white p-4 text-sm leading-6 text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card>
+        <CardContent className="space-y-2 pt-4">
+          <button
+            type="button"
+            onClick={onSave}
+            className="w-full rounded-2xl bg-primary px-5 py-4 text-base font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
+            Save Log
+          </button>
+          {saved ? (
+            <p className="text-center text-xs font-medium text-accent">
+              Saved. You can adjust anytime.
+            </p>
+          ) : (
+            <p className="text-center text-xs text-neutral-body">
+              Your log stays local for now.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
