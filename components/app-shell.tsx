@@ -126,10 +126,22 @@ function AppSidebar() {
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
+  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+
   const activeLabel = useMemo(() => {
     const match = navItems.find((item) => isActive(pathname, item.href));
     return match?.label ?? "NeuroLens";
   }, [pathname]);
+
+  if (isAuthRoute) {
+    return (
+      <div className="min-h-dvh bg-surface-canvas text-neutral-heading">
+        <main className="px-4 py-10">
+          <div className="mx-auto w-full max-w-md">{children}</div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider defaultOpen>
