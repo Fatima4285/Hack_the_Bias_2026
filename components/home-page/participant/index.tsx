@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { type User } from "firebase/auth";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  doc,
+  setDoc,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 import { 
   type DailyLog, 
   type PhaseKey, 
@@ -8,8 +18,8 @@ import {
 } from "./shared";
 import { DailyLogForm } from "./daily-log-form";
 import { PreviousLogs } from "./previous-logs";
+import { Calendar, PenLine } from "lucide-react"; 
 
-const STORAGE_KEY = "neurolens.dailyLogs";
 const TODAY_DRAFT_KEY = "neurolens.todayDraft";
 
 function makeId() {
@@ -42,41 +52,66 @@ export default function ParticipantDashboard({ user }: { user: User | null }) {
 
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [activeLogId, setActiveLogId] = useState<string | null>(null);
+  
+  // NEW: View state
+  const [view, setView] = useState<"new" | "history">("new");
 
-  // Load logs + today's draft (so refresh doesn't clear stars)
+  // Load logs from Firestore + today's draft from localStorage
   useEffect(() => {
-    // Load logs
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as DailyLog[];
-        if (Array.isArray(parsed)) setLogs(parsed);
+    if (!user) return;
+
+    let mounted = true;
+
+    async function fetchData() {
+      // 1. Fetch logs from Firestore
+      try {
+        const q = query(
+          collection(db, "journals"),
+          where("userId", "==", user!.uid),
+          orderBy("savedAt", "desc")
+        );
+        
+        const snapshot = await getDocs(q);
+        const fetchedLogs = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as DailyLog[];
+
+        if (mounted) {
+          setLogs(fetchedLogs);
+        }
+      } catch (err) {
+        console.error("Failed to load journals:", err);
       }
-    } catch {
-      // ignore
+
+      // 2. Load today's draft (client-side only behavior)
+      try {
+        const rawDraft = localStorage.getItem(TODAY_DRAFT_KEY);
+        if (rawDraft) {
+          const parsed = JSON.parse(rawDraft) as {
+            dateKey: string;
+            ratings: Record<SymptomKey, number>;
+            phase: PhaseKey;
+            notes: string;
+          };
+
+          if (mounted && parsed?.dateKey === todayDateKey) {
+            setRatings(parsed.ratings ?? DEFAULT_RATINGS);
+            setPhase(parsed.phase ?? "na");
+            setNotes(parsed.notes ?? "");
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
-    // Load today's draft
-    try {
-      const rawDraft = localStorage.getItem(TODAY_DRAFT_KEY);
-      if (!rawDraft) return;
+    fetchData();
 
-      const parsed = JSON.parse(rawDraft) as {
-        dateKey: string;
-        ratings: Record<SymptomKey, number>;
-        phase: PhaseKey;
-        notes: string;
-      };
-
-      if (parsed?.dateKey === todayDateKey) {
-        setRatings(parsed.ratings ?? DEFAULT_RATINGS);
-        setPhase(parsed.phase ?? "na");
-        setNotes(parsed.notes ?? "");
-      }
-    } catch {
-      // ignore
-    }
-  }, [todayDateKey]);
+    return () => {
+      mounted = false;
+    };
+  }, [user, todayDateKey]);
 
   // Auto-persist today's inputs as a draft on every change
   useEffect(() => {
@@ -112,62 +147,76 @@ export default function ParticipantDashboard({ user }: { user: User | null }) {
       setActiveLogId(null);
   }
 
-
   function loadLog(log: DailyLog) {
     setRatings(log.ratings);
     setPhase(log.phase);
     setNotes(log.notes);
     setActiveLogId(log.id);
     setSaved(true);
+    setView("new"); // Switch to editor view when loading a log
   }
 
-  function onSave() {
+  // Allow clearing function to start fresh
+  function startNewLog() {
+    setRatings(DEFAULT_RATINGS);
+    setPhase("na");
+    setNotes("");
+    setActiveLogId(null);
+    setSaved(false);
+    setView("new");
+  }
+
+  async function onSave() {
+    if (!user) return;
     const nowIso = new Date().toISOString();
     const dateKey = todayDateKey;
 
+    // Check if we already have a log for THIS date in our loaded logs
+    const existingIndex = logs.findIndex((l) => l.dateKey === dateKey);
+
+    let updatedId: string;
+    if (existingIndex >= 0) {
+      updatedId = logs[existingIndex].id;
+    } else {
+      updatedId = makeId();
+    }
+
+    const newLogEntry: DailyLog = {
+      id: updatedId,
+      dateKey,
+      savedAt: nowIso,
+      phase,
+      notes,
+      ratings,
+    };
+
+    // Optimistically update local state
     setLogs((prev) => {
-      const existingIndex = prev.findIndex((l) => l.dateKey === dateKey);
-
       let next: DailyLog[];
-      let updatedId: string;
-
       if (existingIndex >= 0) {
-        const existing = prev[existingIndex];
-        updatedId = existing.id;
-
-        const updated: DailyLog = {
-          ...existing,
-          savedAt: nowIso,
-          phase,
-          notes,
-          ratings,
-        };
-
-        next = [updated, ...prev.filter((l) => l.id !== existing.id)].slice(0, 50);
+        // Replace existing
+        next = [...prev];
+        next[existingIndex] = newLogEntry;
       } else {
-        const newLog: DailyLog = {
-          id: makeId(),
-          dateKey,
-          savedAt: nowIso,
-          phase,
-          notes,
-          ratings,
-        };
-        updatedId = newLog.id;
-        next = [newLog, ...prev].slice(0, 50);
+        // Add new at top
+        next = [newLogEntry, ...prev];
       }
-
-      setSaved(true);
-      setActiveLogId(updatedId);
-
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-
       return next;
     });
+
+    setSaved(true);
+    setActiveLogId(updatedId);
+
+    // Save to Firestore
+    try {
+      await setDoc(doc(db, "journals", updatedId), {
+        ...newLogEntry,
+        userId: user.uid,
+      });
+    } catch (err) {
+      console.error("Failed to save log to Firestore:", err);
+      setSaved(false);
+    }
   }
 
   return (
@@ -179,24 +228,66 @@ export default function ParticipantDashboard({ user }: { user: User | null }) {
         </h1>
       </header>
 
-      <PreviousLogs 
-        logs={logs} 
-        activeLogId={activeLogId} 
-        onLoadLog={loadLog} 
-      />
+      {/* Tabs / Navigation */}
+      <div className="flex items-center gap-2 rounded-xl bg-white p-1 border border-black/5 w-fit">
+        <button
+           onClick={() => setView("new")}
+          className={
+            "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition " +
+            (view === "new"
+              ? "bg-primary text-white shadow-sm"
+              : "text-neutral-body hover:bg-secondary hover:text-ink")
+          }
+        >
+          <PenLine className="h-4 w-4" />
+          Check-in
+        </button>
+        <button
+          onClick={() => setView("history")}
+          className={
+            "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition " +
+            (view === "history"
+              ? "bg-primary text-white shadow-sm"
+              : "text-neutral-body hover:bg-secondary hover:text-ink")
+          }
+        >
+          <Calendar className="h-4 w-4" />
+          History
+        </button>
+      </div>
 
-      <DailyLogForm
-        ratings={ratings}
-        phase={phase}
-        notes={notes}
-        saved={saved}
-        activeLogId={activeLogId}
-        onRatingChange={handleSetRating}
-        onPhaseChange={handleSetPhase}
-        onNotesChange={handleSetNotes}
-        onSave={onSave}
-        onClearRating={handleClearRating}
-      />
+      <div>
+        {view === "new" ? (
+           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+             {activeLogId && (
+                <div className="mb-4 flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-sm text-ink">
+                    <span>Editing entry from existing log.</span>
+                    <button onClick={startNewLog} className="font-semibold hover:underline">Start New</button>
+                </div>
+             )}
+            <DailyLogForm
+                ratings={ratings}
+                phase={phase}
+                notes={notes}
+                saved={saved}
+                activeLogId={activeLogId}
+                onRatingChange={handleSetRating}
+                onPhaseChange={handleSetPhase}
+                onNotesChange={handleSetNotes}
+                onSave={onSave}
+                onClearRating={handleClearRating}
+            />
+          </div>
+        ) : (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <PreviousLogs 
+                logs={logs} 
+                activeLogId={activeLogId} 
+                onLoadLog={loadLog} 
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

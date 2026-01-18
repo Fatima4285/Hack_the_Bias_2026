@@ -33,7 +33,7 @@ export function DailyLogForm({
   onClearRating,
 }: DailyLogFormProps) {
   return (
-    <>
+    <div className="space-y-4">
       {/* SYMPTOMS */}
       <section className="space-y-3" aria-label="Symptom grid">
         <Card>
@@ -182,6 +182,6 @@ export function DailyLogForm({
           )}
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }
