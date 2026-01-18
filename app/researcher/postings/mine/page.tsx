@@ -157,9 +157,6 @@ export default function ResearcherPostingsMinePage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-ink">Your postings</h1>
-            <p className="text-sm text-neutral-body">
-              Data source: Firestore collection <span className="font-semibold">experiences</span>.
-            </p>
           </div>
 
           <div className="flex gap-3">
