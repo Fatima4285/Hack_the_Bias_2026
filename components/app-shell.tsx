@@ -12,6 +12,11 @@ import {
   User,
   NotebookText,
   Search,
+  LayoutDashboard,
+  PlusSquare,
+  ClipboardList,
+  LineChart,
+  FlaskConical,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
@@ -34,29 +39,33 @@ type NavItem = {
   Icon: typeof BookOpenCheck;
 };
 
-const navItems: NavItem[] = [
+const participantNavItems: NavItem[] = [
   { href: "/", label: "Journal", Icon: BookOpenCheck },
+  { href: "/experiences", label: "Your Experiences", Icon: NotebookText},
   { href: "/insights", label: "Insights", Icon: Sparkles },
-  { href: "/connect", label: "Connect", Icon: Handshake },
-  { href: "/share", label: "Share an Experience", Icon: MessageSquareHeart},
-  { href: "/entries", label: "Your Entries", Icon: NotebookText},
-  { href: "/recommendations", label: "Research Recommendations", Icon: Search},
-];
- 
-const footerItems: NavItem[] = [
-  { href: "/profile", label: "Profile", Icon: User },
-  { href: "/settings", label: "Settings", Icon: Settings },
-  { href: "/help", label: "Help", Icon: LifeBuoy },
 ];
 
+const researcherNavItems: NavItem[] = [
+  { href: "/researcher/postings/new", label: "Add a posting", Icon: PlusSquare },
+  { href: "/researcher/postings/mine", label: "Your postings", Icon: ClipboardList },
+  { href: "/researcher/explore", label: "Explore patterns", Icon: LineChart },
+];
+
+const NavFooterItems: NavItem[] = [
+  { href: "/profile", label: "Profile", Icon: User },
+];
+
+
 function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
+  if (href === "/" || href === "/researcher") return pathname === href;
   return pathname.startsWith(href);
 }
 
-function AppSidebar() {
+function AppSidebar({ role }: { role: "participant" | "researcher" | null }) {
   const pathname = usePathname();
   const { open } = useSidebar();
+
+  const navItems = role === "researcher" ? researcherNavItems : participantNavItems;
 
   return (
     <Sidebar collapsible="icon" className="shrink-0">
@@ -68,7 +77,7 @@ function AppSidebar() {
               "truncate text-sm font-semibold text-ink" + (!open ? " sr-only" : "")
             }
           >
-            Miss Neuroverse
+            Miss NeuroVerse
           </p>
         </div>
         <SidebarTrigger />
@@ -102,7 +111,7 @@ function AppSidebar() {
       <SidebarFooter>
         <div className="my-2 h-px bg-black/10" />
         <SidebarMenu>
-          {footerItems.map(({ href, label, Icon }) => {
+          {NavFooterItems.map(({ href, label, Icon }) => {
             const active = isActive(pathname, href);
             return (
               <SidebarMenuButton key={href} isActive={active} asChild>
@@ -131,7 +140,7 @@ function AppSidebar() {
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, role, loading } = useAuth();
 
   const isAuthRoute = pathname === "/auth/login" || pathname === "/auth/signup";
 
@@ -142,9 +151,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, [loading, user, isAuthRoute, router]);
 
   const activeLabel = useMemo(() => {
-    const match = navItems.find((item) => isActive(pathname, item.href));
+    const currentItems = role === "researcher" ? [...researcherNavItems, ...NavFooterItems] : [...participantNavItems, ...NavFooterItems];
+    const match = currentItems.find((item) => isActive(pathname, item.href));
     return match?.label ?? "NeuroLens";
-  }, [pathname]);
+  }, [pathname, role]);
 
   if (isAuthRoute) {
     return (
@@ -164,7 +174,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <SidebarProvider defaultOpen>
       <div className="min-h-dvh bg-surface-canvas text-neutral-heading">
         <div className="w-full md:flex md:items-stretch md:gap-6">
-          <AppSidebar />
+          <AppSidebar role={role} />
 
           <div className="min-w-0 flex-1">
             {/* Mobile top bar with sidebar drawer trigger */}

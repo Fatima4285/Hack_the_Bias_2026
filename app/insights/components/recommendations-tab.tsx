@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 type Study = {
@@ -32,32 +37,17 @@ const STUDIES: Study[] = [
     ethicsNote:
       "This study is conducted under institutional ethics review. You’ll see the research team’s details and consent form before sharing any information.",
   },
-  // add more studies here later
 ];
 
-type View = "feed" | "details" | "apply";
-type TabKey = "recommended" | "applied";
+type RecView = "feed" | "details" | "apply";
+type RecTabKey = "recommended" | "applied";
 
-export default function ResearchRecommendationsPage() {
-  const userName = "Maya";
-
-  const todayLabel = useMemo(() => {
-    return new Date().toLocaleDateString(undefined, {
-      weekday: "long",
-      month: "short",
-      day: "numeric",
-    });
-  }, []);
-
-  const [tab, setTab] = useState<TabKey>("recommended");
+export function RecommendationsTab() {
+  const [tab, setTab] = useState<RecTabKey>("recommended");
   const [skippedIds, setSkippedIds] = useState<Record<string, boolean>>({});
-
-  // user has "applied" after they agree (consent)
   const [appliedIds, setAppliedIds] = useState<Record<string, boolean>>({});
-
   const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
-  const [view, setView] = useState<View>("feed");
-
+  const [view, setView] = useState<RecView>("feed");
   const [policyOpen, setPolicyOpen] = useState(true);
 
   const selectedStudy = useMemo(() => {
@@ -81,11 +71,6 @@ export default function ResearchRecommendationsPage() {
     setSkippedIds((prev) => ({ ...prev, [studyId]: true }));
   }
 
-  function onBackToFeed() {
-    setView("feed");
-    setSelectedStudyId(null);
-  }
-
   function onInterested() {
     setView("apply");
     setPolicyOpen(true);
@@ -93,11 +78,7 @@ export default function ResearchRecommendationsPage() {
 
   function onAgreeAndShare() {
     if (!selectedStudyId) return;
-
-    // Mark as applied ONLY after user agrees
     setAppliedIds((prev) => ({ ...prev, [selectedStudyId]: true }));
-
-    // Return to feed + switch to Applied tab
     setView("feed");
     setSelectedStudyId(null);
     setTab("applied");
@@ -106,31 +87,30 @@ export default function ResearchRecommendationsPage() {
   const feedStudies = tab === "recommended" ? recommendedStudies : appliedStudies;
 
   return (
-    <div className="space-y-5">
-      <header className="space-y-1">
-        <p className="text-sm text-neutral-body">{todayLabel}</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          Hi {userName} — research recommendations.
-        </h1>
-        <p className="text-sm leading-6 text-neutral-body">
-          You’ll only be connected if you tap <span className="font-semibold text-ink">I’m Interested</span> and then
-          agree to share your contact info.
-        </p>
-      </header>
+    <div className="space-y-4">
+       <Card className="bg-secondary/50 border-none">
+          <CardContent className="pt-4 flex gap-3 text-sm text-neutral-body">
+            <span className="shrink-0 bg-primary/10 p-1 rounded-full text-primary">ℹ️</span>
+            <p>
+              Match with active research studies looking for participants like you. 
+              You’ll only be connected if you explicitly agree to share your contact info.
+            </p>
+          </CardContent>
+       </Card>
 
       {/* TABS */}
       {view === "feed" && (
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle>{tab === "recommended" ? "Recommended studies" : "Applied research"}</CardTitle>
+              <CardTitle className="text-base">{tab === "recommended" ? "Recommended studies" : "Applied research"}</CardTitle>
 
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setTab("recommended")}
                   className={
-                    "rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60 " +
+                    "rounded-full px-4 py-2 text-xs font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60 " +
                     (tab === "recommended" ? "bg-primary text-white" : "bg-white text-ink hover:bg-secondary")
                   }
                   aria-pressed={tab === "recommended"}
@@ -141,7 +121,7 @@ export default function ResearchRecommendationsPage() {
                   type="button"
                   onClick={() => setTab("applied")}
                   className={
-                    "rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60 " +
+                    "rounded-full px-4 py-2 text-xs font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60 " +
                     (tab === "applied" ? "bg-primary text-white" : "bg-white text-ink hover:bg-secondary")
                   }
                   aria-pressed={tab === "applied"}
@@ -154,7 +134,7 @@ export default function ResearchRecommendationsPage() {
 
           <CardContent>
             {feedStudies.length === 0 ? (
-              <p className="text-sm leading-6 text-neutral-body">
+              <p className="text-sm leading-6 text-neutral-body py-4">
                 {tab === "recommended"
                   ? "No recommendations right now. Check back later."
                   : "You haven’t applied to any studies yet."}
@@ -328,14 +308,6 @@ export default function ResearchRecommendationsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-black/10 bg-white p-4">
-              <p className="text-xs font-semibold text-neutral-body">What happens next</p>
-              <p className="mt-1 text-sm leading-6 text-ink">
-                If you agree, we’ll share your contact info with the research team. They’ll follow up using their normal
-                study process (screening, consent, scheduling).
-              </p>
-            </div>
-
             <div className="flex gap-2">
               <button
                 type="button"
@@ -350,7 +322,7 @@ export default function ResearchRecommendationsPage() {
                 onClick={onAgreeAndShare}
                 className="flex-1 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
               >
-                Agree & Share Contact Info
+                Agree & Share
               </button>
             </div>
 
