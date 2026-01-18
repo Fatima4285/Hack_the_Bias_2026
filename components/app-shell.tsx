@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpenCheck,
   Handshake,
@@ -12,7 +12,8 @@ import {
   NotebookText,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useAuth } from "@/components/auth-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -125,11 +126,35 @@ function AppSidebar() {
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  const isAuthRoute = pathname === "/auth/login" || pathname === "/auth/signup";
+
+  useEffect(() => {
+    if (!loading && !user && !isAuthRoute) {
+      router.replace("/auth/login");
+    }
+  }, [loading, user, isAuthRoute, router]);
 
   const activeLabel = useMemo(() => {
     const match = navItems.find((item) => isActive(pathname, item.href));
     return match?.label ?? "NeuroLens";
   }, [pathname]);
+
+  if (isAuthRoute) {
+    return (
+      <div className="min-h-dvh bg-surface-canvas text-neutral-heading">
+        <main className="px-4 py-10">
+          <div className="mx-auto w-full max-w-md">{children}</div>
+        </main>
+      </div>
+    );
+  }
+
+  if (loading || !user) {
+    return null;
+  }
 
   return (
     <SidebarProvider defaultOpen>
