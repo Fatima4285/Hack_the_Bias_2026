@@ -29,7 +29,7 @@ export function EntriesList() {
       try {
         const q = query(
           collection(db, "experiences"),
-          where("userId", "==", currentUser.uid)
+          where("userId", "==", currentUser!.uid)
         );
         const snapshot = await getDocs(q);
 

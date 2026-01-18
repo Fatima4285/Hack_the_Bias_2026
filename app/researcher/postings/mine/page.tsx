@@ -193,7 +193,6 @@ export default function ResearcherPostingsPage() {
             <button
               type="button"
               onClick={() => router.push("/researcher/postings/new")}
-              onClick={() => router.push("/researcher/postings/new")}
               className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
             >
               Add a posting
