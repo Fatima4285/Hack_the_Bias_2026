@@ -1,0 +1,23 @@
+[
+  {
+    "id": "uoft-womens-health-fatigue",
+    "org": "University of Toronto",
+    "title": "Women’s Health Study",
+    "hook": "Looking for people with long-term fatigue and dismissal experiences.",
+    "purpose": [
+      "Understand how long-term fatigue affects daily life and care experiences.",
+      "Identify patterns in dismissal or delayed support to inform better clinical pathways."
+    ],
+    "involves": [
+      "A short eligibility screener (2–3 minutes).",
+      "One survey (10–15 minutes).",
+      "Optional interview (30–45 minutes) conducted online."
+    ],
+    "symptoms": [
+        "Executive dysfunction", 
+        "Pain"
+    ],
+    "ethicsNote": "This study is conducted under institutional ethics review. You’ll see the research team’s details and consent form before sharing any information."
+  }
+]
+

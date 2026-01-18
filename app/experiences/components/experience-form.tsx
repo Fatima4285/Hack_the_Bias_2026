@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { getAuth } from "firebase/auth";
+
+
 
 const symptomOptions = [
   "Executive dysfunction",
@@ -35,9 +38,11 @@ export function ExperienceForm({ onSuccess }: { onSuccess?: () => void }) {
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [title, setTitle] = useState("");
-  const [ageType, setAgeType] = useState(""); // "range" | "exact"
-  const [ageRange, setAgeRange] = useState("");
-  const [ageExact, setAgeExact] = useState("");
+const [ageType, setAgeType] = useState(""); // "range" | "exact"
+const [ageRange, setAgeRange] = useState("");
+const [ageExact, setAgeExact] = useState("");
+const auth = getAuth();
+const currentUser = auth.currentUser;
 
   function toggleSymptom(symptom: string) {
     setSymptoms((prev) =>
@@ -67,7 +72,8 @@ export function ExperienceForm({ onSuccess }: { onSuccess?: () => void }) {
         misunderstood,
         notes,
         createdAt: serverTimestamp(),
-      });
+        userId: currentUser ? currentUser.uid : null,
+        });
 
       setSubmitted(true);
 
