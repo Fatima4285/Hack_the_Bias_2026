@@ -94,7 +94,7 @@ export default function ProfilePage() {
           )}
         </CardContent>
         <CardFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
-          {user ? (
+          {user && (
             <button
               type="button"
               onClick={() => signOut(auth)}
@@ -102,13 +102,6 @@ export default function ProfilePage() {
             >
               Sign out
             </button>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-95"
-            >
-              Sign in
-            </Link>
           )}
         </CardFooter>
       </Card>

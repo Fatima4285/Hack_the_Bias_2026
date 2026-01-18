@@ -15,7 +15,7 @@ export default function EntriesPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">
-            {view === "list" ? "Your Journal" : "New Entry"}
+            {view === "list" ? "Your Experiences" : "New Entry"}
           </h1>
           <p className="text-sm text-neutral-body">
             {view === "list"
