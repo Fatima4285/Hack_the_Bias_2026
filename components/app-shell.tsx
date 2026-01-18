@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpenCheck,
   Handshake,
@@ -14,7 +14,8 @@ import {
   Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useAuth } from "@/components/auth-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -130,6 +131,16 @@ function AppSidebar() {
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  const isAuthRoute = pathname === "/auth/login" || pathname === "/auth/signup";
+
+  useEffect(() => {
+    if (!loading && !user && !isAuthRoute) {
+      router.replace("/auth/login");
+    }
+  }, [loading, user, isAuthRoute, router]);
 
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
 
@@ -146,6 +157,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
     );
+  }
+
+  if (loading || !user) {
+    return null;
   }
 
   return (

@@ -11,7 +11,8 @@ import {
   signInWithRedirect,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/client";
 import { useAuth } from "@/components/auth-provider";
 import {
   Card,
@@ -46,15 +47,24 @@ export default function SignupPage() {
   const { user, loading } = useAuth();
 
   const [name, setName] = useState("");
+  const [role, setRole] = useState<"participant" | "researcher" | null>(null);
   const [email, setEmail] = useState("");
+  const [institutionEmail, setInstitutionEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => {
-    return isValidEmail(email.trim()) && password.length >= 6 && !submitting;
-  }, [email, password, submitting]);
+    const isResearcher = role === "researcher";
+    const isRoleValid = role !== null;
+    const isNameValid = name.trim().length > 0;
+    const isEmailValid = isValidEmail(email.trim());
+    const isInstitutionEmailValid = !isResearcher || isValidEmail(institutionEmail.trim());
+    const isPasswordValid = password.length >= 6;
+    
+    return isRoleValid && isNameValid && isEmailValid && isInstitutionEmailValid && isPasswordValid && !submitting;
+  }, [role, name, email, institutionEmail, password, submitting]);
 
   useEffect(() => {
     if (!loading && user) router.replace("/");
@@ -64,12 +74,21 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
 
+    const displayName = name.trim();
+    if (!displayName) {
+      setError("Please enter your name.");
+      return;
+    }
+
     const normalizedEmail = email.trim();
     if (!isValidEmail(normalizedEmail)) {
       setError("Please enter a valid email address.");
       return;
     }
-
+    if (role === "researcher" && !isValidEmail(institutionEmail.trim())) {
+      setError("Please enter a valid institution email.");
+      return;
+    }
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
@@ -83,10 +102,20 @@ export default function SignupPage() {
         password
       );
 
-      const displayName = name.trim();
       if (displayName) {
         await updateProfile(credential.user, { displayName });
+        console.log("User ID: ", credential.user.uid);
       }
+
+      // Create user document with role
+      await setDoc(doc(db, "users", credential.user.uid), {
+        uid: credential.user.uid,
+        email: normalizedEmail,
+        displayName,
+        role,
+        ...(role === "researcher" ? { institutionEmail: institutionEmail.trim() } : {}),
+        createdAt: new Date(),
+      });
 
       router.push("/");
     } catch (err: unknown) {
@@ -98,14 +127,37 @@ export default function SignupPage() {
 
   async function onGoogleSignup() {
     setError(null);
+    
+    if (!role) {
+      setError("Please select whether you are a Participant or Researcher.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      
+      // Check if user doc exists, if not create it with selected role
+      const userRef = doc(db, "users", result.user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) {
+        await setDoc(userRef, {
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            role: role,
+            createdAt: new Date(),
+        });
+      }
+
       router.push("/");
     } catch (err: unknown) {
       const code = (err as { code?: string } | null)?.code;
       if (code === "auth/popup-blocked" || code === "auth/popup-closed-by-user") {
         try {
+          // Note: Redirect flow is harder to intercept for role creation mid-flight 
+          // without a custom intermediate page, but we'll try basic auth.
           await signInWithRedirect(auth, new GoogleAuthProvider());
           return;
         } catch (redirectErr: unknown) {
@@ -139,13 +191,48 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-neutral-body">
+                  I am a...
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRole("participant")}
+                    className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                      role === "participant"
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-ink border-black/10 hover:bg-secondary"
+                    }`}
+                  >
+                    Participant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole("researcher")}
+                    className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                      role === "researcher"
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-ink border-black/10 hover:bg-secondary"
+                    }`}
+                  >
+                    Researcher
+                  </button>
+                </div>
+              </div>
+
             <button
               type="button"
               onClick={onGoogleSignup}
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-black/10 bg-white px-5 py-4 text-base font-semibold text-ink shadow-sm transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              className={`flex w-full items-center justify-center gap-2 rounded-2xl border px-5 py-4 text-base font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                !role 
+                ? "bg-neutral-100 text-neutral-400 border-transparent cursor-not-allowed" 
+                : "bg-white text-ink border-black/10 hover:bg-secondary"
+              }`}
+              title={!role ? "Please select a role first" : "Sign up with Google"}
             >
-              <GoogleMark className="h-5 w-5" />
+              <GoogleMark className={`h-5 w-5 ${!role ? "opacity-50" : ""}`} />
               Continue with Google
             </button>
 
@@ -158,7 +245,7 @@ export default function SignupPage() {
             <form onSubmit={onSubmit} className="space-y-3">
               <label className="block space-y-1">
                 <span className="text-xs font-semibold text-neutral-body">
-                  Name (optional)
+                  Name
                 </span>
                 <input
                   value={name}
@@ -187,6 +274,24 @@ export default function SignupPage() {
                   className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
                 />
               </label>
+
+              {role === "researcher" && (
+                <label className="block space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <span className="text-xs font-semibold text-neutral-body">
+                    Institution Email
+                  </span>
+                  <input
+                    value={institutionEmail}
+                    onChange={(e) => setInstitutionEmail(e.target.value)}
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="name@university.edu"
+                    disabled={submitting}
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
+                  />
+                </label>
+              )}
 
               <label className="block space-y-1">
                 <span className="text-xs font-semibold text-neutral-body">
