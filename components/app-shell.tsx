@@ -10,6 +10,7 @@ import {
   Sparkles,
   User,
   NotebookText,
+  Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
@@ -36,6 +37,8 @@ const navItems: NavItem[] = [
   { href: "/insights", label: "Insights", Icon: Sparkles },
   { href: "/connect", label: "Connect", Icon: Handshake },
   { href: "/entries", label: "Your Entries", Icon: NotebookText},
+  { href: "/recommendations", label: "Research Recommendations", Icon: Search},
+
 ];
  
 const footerItems: NavItem[] = [
