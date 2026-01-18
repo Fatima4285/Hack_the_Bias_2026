@@ -3,41 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { db } from "@/lib/firebase/client";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-
-function parseTags(raw: string) {
-  return raw
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .slice(0, 20);
-}
-
-function normalizeDraft(draft: PostingDraft) {
-  return {
-    title: draft.title.trim(),
-    institution: draft.institution.trim(),
-    studyType: draft.studyType,
-    participationMode: draft.participationMode,
-    location: draft.participationMode === "remote" ? "" : draft.location.trim(),
-
-    description: draft.description.trim(),
-    lookingFor: draft.lookingFor.trim(),
-    incentives: draft.incentives.trim(),
-
-    anonymousAllowed: draft.anonymousAllowed,
-    requiresConsent: draft.requiresConsent,
-
-    tags: parseTags(draft.tags),
-
-    status: "published" as const,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-}
-
-
+import { db } from "@/lib/firebase/client"; // make sure your Firebase client is set up
+import { getAuth } from "firebase/auth";
 
 type StudyType = "survey" | "interview" | "diary" | "focus-group" | "mixed" | "other";
 type ParticipationMode = "remote" | "in-person" | "hybrid";
@@ -45,18 +13,14 @@ type ParticipationMode = "remote" | "in-person" | "hybrid";
 export type PostingDraft = {
   title: string;
   institution: string;
-
   studyType: StudyType;
   participationMode: ParticipationMode;
   location: string;
-
   description: string;
   lookingFor: string;
   incentives: string;
-
   anonymousAllowed: boolean;
   requiresConsent: boolean;
-
   tags: string; // comma-separated for now; later store as string[]
 };
 
@@ -114,8 +78,6 @@ function ToggleRow({
   );
 }
 
-const DRAFT_KEY = "neurolens.research.postingDraft.v1";
-
 export default function AddPostingPage() {
   const router = useRouter();
 
@@ -133,83 +95,54 @@ export default function AddPostingPage() {
     tags: "",
   });
 
-  const [status, setStatus] = useState<"idle" | "saved" | "published">("idle");
+  const [status, setStatus] = useState<"idle" | "published">("idle");
 
   const canPublish = useMemo(() => {
-    if (!draft.title.trim()) return false;
-    if (!draft.institution.trim()) return false;
-    if (!draft.description.trim()) return false;
-    return true;
-  }, [draft.title, draft.institution, draft.description]);
+    return draft.title.trim() && draft.institution.trim() && draft.description.trim();
+  }, [draft]);
 
   function update<K extends keyof PostingDraft>(key: K, value: PostingDraft[K]) {
     setDraft((prev) => ({ ...prev, [key]: value }));
     setStatus("idle");
   }
 
-  function saveDraftLocal() {
-    try {
-      localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          savedAt: new Date().toISOString(),
-          draft,
-        })
-      );
-    } catch {
-      // ignore
-    }
-    setStatus("saved");
+ async function publishToFirebase() {
+  if (!canPublish) return;
+
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    alert("You must be logged in to publish a posting.");
+    return;
   }
 
-  function loadDraftLocal() {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as { draft?: PostingDraft };
-      if (parsed?.draft) {
-        setDraft(parsed.draft);
-        setStatus("saved");
-      }
-    } catch {
-      // ignore
-    }
+  try {
+    await addDoc(collection(db, "postings"), {
+      ...draft,
+      userId: currentUser.uid, // <-- store the current user's ID
+      tags: draft.tags.split(",").map(tag => tag.trim()).filter(Boolean),
+      createdAt: serverTimestamp(),
+    });
+    setStatus("published");
+    router.push("/researcher");
+  } catch (error) {
+    console.error("Error saving posting:", error);
+    alert("Failed to save posting. Check console for details.");
   }
-
-  async function publishStub() {
-    if (!canPublish) return;
-  
-    try {
-      // Create document in Firestore collection "experiences"
-      await addDoc(collection(db, "experiences"), normalizeDraft(draft));
-  
-      setStatus("published");
-  
-      // send them somewhere sensible after publish:
-      router.push("/researcher/postings/mine"); // keep your existing route style
-    } catch (e) {
-      console.error(e);
-      setStatus("idle");
-      // optional: show error UI later
-    }
-  }
-  
+}
 
   return (
     <div className="space-y-6">
       <header className="space-y-1">
         <p className="text-sm text-neutral-body">Research</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          Add a posting
-        </h1>
-        <p className="text-sm text-neutral-body">
-          No database yet — this page saves locally for now, and can be wired to the backend later.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">Add a posting</h1>
       </header>
 
       <div className="grid gap-5 md:grid-cols-3">
         {/* LEFT: FORM */}
         <div className="space-y-5 md:col-span-2">
+          {/* Study Details Card */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle>Study details</CardTitle>
@@ -271,7 +204,7 @@ export default function AddPostingPage() {
                 </div>
               </div>
 
-              {draft.participationMode !== "remote" ? (
+              {draft.participationMode !== "remote" && (
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-ink">Location</label>
                   <input
@@ -281,12 +214,10 @@ export default function AddPostingPage() {
                     className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
                   />
                 </div>
-              ) : null}
+              )}
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-ink">
-                  Describe your research
-                </label>
+                <label className="text-sm font-semibold text-ink">Describe your research</label>
                 <textarea
                   value={draft.description}
                   onChange={(e) => update("description", e.target.value)}
@@ -308,6 +239,7 @@ export default function AddPostingPage() {
             </CardContent>
           </Card>
 
+          {/* Recruitment Card */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle>Recruitment</CardTitle>
@@ -331,7 +263,7 @@ export default function AddPostingPage() {
                   onChange={(e) => update("incentives", e.target.value)}
                   rows={3}
                   placeholder="Gift cards, compensation, course credit, etc."
-                  className="w-full resize-none rounded-2xl border border-black/10 bg-white p-4 text-sm leading-6 text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
+                  className="w-full resize-none rounded-2xl border border-black/10 bg-white p-4 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
                 />
               </div>
 
@@ -352,71 +284,26 @@ export default function AddPostingPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="space-y-2 pt-4">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={loadDraftLocal}
-                  className="w-full rounded-2xl bg-white px-5 py-4 text-base font-semibold text-ink shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary/60"
-                >
-                  Load saved draft
-                </button>
-                <button
-                  type="button"
-                  onClick={saveDraftLocal}
-                  className="w-full rounded-2xl bg-secondary px-5 py-4 text-base font-semibold text-ink shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
-                >
-                  Save draft 
-                </button>
-                <button
-                  type="button"
-                  onClick={publishStub}
-                  disabled={!canPublish}
-                  className={
-                    "w-full rounded-2xl px-5 py-4 text-base font-semibold text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60" +
-                    (canPublish ? " bg-primary hover:brightness-95" : " bg-black/30 cursor-not-allowed")
-                  }
-                >
-                  Publish (stub)
-                </button>
-              </div>
+          {/* Publish Button */}
+          <button
+            type="button"
+            onClick={publishToFirebase}
+            disabled={!canPublish}
+            className={
+              "w-full rounded-2xl px-5 py-4 text-base font-semibold text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60" +
+              (canPublish ? " bg-primary hover:brightness-95" : " bg-black/30 cursor-not-allowed")
+            }
+          >
+            Publish
+          </button>
 
-              {status === "published" ? (
-                <p className="text-center text-xs font-medium text-accent">Published (stub).</p>
-              ) : status === "saved" ? (
-                <p className="text-center text-xs font-medium text-accent">Draft saved locally.</p>
-              ) : (
-                <p className="text-center text-xs text-neutral-body">
-                  
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          {status === "published" && (
+            <p className="text-center text-xs font-medium text-accent">Published.</p>
+          )}
         </div>
 
         {/* RIGHT: PROFILE + PREVIEW */}
         <div className="space-y-5">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle>About you / Profile</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold text-ink">Description</p>
-                <p className="mt-1 text-sm leading-6 text-neutral-body">
-                  DB-backed researcher profile later. Placeholder for now.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold text-ink">Contact</p>
-                <p className="mt-1 text-sm leading-6 text-neutral-body">
-                  researcher@dev.local (placeholder)
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle>Preview</CardTitle>

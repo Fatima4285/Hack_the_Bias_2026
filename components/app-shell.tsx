@@ -46,9 +46,8 @@ const participantNavItems: NavItem[] = [
 ];
 
 const researcherNavItems: NavItem[] = [
-  { href: "/researcher/postings/new", label: "Add a posting", Icon: PlusSquare },
-  { href: "/researcher/postings/mine", label: "Your postings", Icon: ClipboardList },
-  { href: "/researcher/explore", label: "Explore patterns", Icon: LineChart },
+  { href: "/researcher/postings/mine", label: "Your Research", Icon: ClipboardList },
+  { href: "/researcher/explore", label: "Explore Patterns", Icon: LineChart },
 ];
 
 const NavFooterItems: NavItem[] = [
