@@ -71,21 +71,34 @@ export function RecommendationsTab() {
         setLoadingStudies(true);
 
         const q = query(
-          collection(db, "studies"),
-          where("isActive", "==", true)
+          collection(db, "postings")
         );
 
         const snap = await getDocs(q);
-        const rows = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Study, "id">),
-        }));
+        const rows = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            org: data.institution || data.org || "Unknown Organization",
+            title: data.title || "Untitled Study",
+            hook: data.description || data.hook || "No description available.",
+            purpose: Array.isArray(data.purpose) 
+              ? data.purpose 
+              : (data.lookingFor ? [data.lookingFor] : ["No specific purpose listed."]),
+            involves: Array.isArray(data.involves) 
+              ? data.involves 
+              : [
+                  data.studyType && `Type: ${data.studyType}`,
+                  data.participationMode && `Mode: ${data.participationMode}`,
+                  data.location && `Location: ${data.location}`,
+                  data.incentives && `Incentives: ${data.incentives}`,
+                ].filter(Boolean) as string[],
+            ethicsNote: data.ethicsNote || (data.requiresConsent ? "Participant consent required." : ""),
+            isActive: data.isActive
+          } as Study;
+        });
 
         rows.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
-        setStudies(rows);
-        // stable order (Firestore doesn't guarantee order without orderBy)
-        rows.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
-
         setStudies(rows);
       } catch (e: any) {
         setStudiesError(e?.message ?? "Failed to load studies.");
