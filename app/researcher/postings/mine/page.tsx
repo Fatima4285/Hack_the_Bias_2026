@@ -5,13 +5,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { db } from "@/lib/firebase/client";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
+
 type StudyType = "survey" | "interview" | "diary" | "focus-group" | "mixed" | "other";
 type ParticipationMode = "remote" | "in-person" | "hybrid";
 
 type Posting = {
   id: string;
-  createdAt: string;
-  updatedAt: string;
 
   status: "draft" | "published";
 
@@ -29,34 +39,17 @@ type Posting = {
   anonymousAllowed: boolean;
   requiresConsent: boolean;
 
-  tags: string[]; // stored as array here
+  tags: string[];
+
+  createdAt?: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
 };
 
-const STORAGE_KEY = "neurolens.research.postings.v1";
-
-function safeParsePostings(raw: string | null): Posting[] {
-  if (!raw) return [];
+function formatDate(ts: any) {
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // light validation
-    return parsed.filter((p) => p && typeof p.id === "string" && typeof p.title === "string");
-  } catch {
-    return [];
-  }
-}
-
-function savePostings(postings: Posting[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(postings));
-  } catch {
-    // ignore
-  }
-}
-
-function formatDate(iso: string) {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const d = ts?.toDate?.();
+    if (!d) return "—";
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   } catch {
     return "—";
   }
@@ -76,18 +69,58 @@ function StatusPill({ status }: { status: Posting["status"] }) {
   );
 }
 
-export default function ResearcherPostingsPage() {
+export default function ResearcherPostingsMinePage() {
   const router = useRouter();
   const [postings, setPostings] = useState<Posting[]>([]);
-  const [query, setQuery] = useState("");
+  const [queryText, setQueryText] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loaded = safeParsePostings(localStorage.getItem(STORAGE_KEY));
-    setPostings(loaded);
+    const q = query(collection(db, "experiences"), orderBy("updatedAt", "desc"));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const items: Posting[] = snap.docs.map((d) => {
+          const data = d.data() as any;
+          return {
+            id: d.id,
+            status: data.status ?? "published",
+
+            title: data.title ?? "",
+            institution: data.institution ?? "",
+
+            studyType: data.studyType ?? "survey",
+            participationMode: data.participationMode ?? "remote",
+            location: data.location ?? "",
+
+            description: data.description ?? "",
+            lookingFor: data.lookingFor ?? "",
+            incentives: data.incentives ?? "",
+
+            anonymousAllowed: !!data.anonymousAllowed,
+            requiresConsent: !!data.requiresConsent,
+
+            tags: Array.isArray(data.tags) ? data.tags : [],
+
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+          };
+        });
+
+        setPostings(items);
+        setLoading(false);
+      },
+      (err) => {
+        console.error(err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
   }, []);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = queryText.trim().toLowerCase();
     if (!q) return postings;
     return postings.filter((p) => {
       return (
@@ -96,31 +129,25 @@ export default function ResearcherPostingsPage() {
         p.tags.join(",").toLowerCase().includes(q)
       );
     });
-  }, [postings, query]);
+  }, [postings, queryText]);
 
-  function removePosting(id: string) {
-    const next = postings.filter((p) => p.id !== id);
-    setPostings(next);
-    savePostings(next);
+  async function removePosting(id: string) {
+    await deleteDoc(doc(db, "experiences", id));
   }
 
-  function duplicatePosting(id: string) {
+  async function duplicatePosting(id: string) {
     const original = postings.find((p) => p.id === id);
     if (!original) return;
 
-    const now = new Date().toISOString();
-    const copy: Posting = {
-      ...original,
-      id: crypto.randomUUID(),
+    const { id: _ignore, createdAt: _c, updatedAt: _u, ...rest } = original;
+
+    await addDoc(collection(db, "experiences"), {
+      ...rest,
       status: "draft",
       title: original.title + " (copy)",
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const next = [copy, ...postings];
-    setPostings(next);
-    savePostings(next);
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
   }
 
   return (
@@ -131,14 +158,14 @@ export default function ResearcherPostingsPage() {
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-ink">Your postings</h1>
             <p className="text-sm text-neutral-body">
-              Local demo data for now. Later this will load from the database.
+              Data source: Firestore collection <span className="font-semibold">experiences</span>.
             </p>
           </div>
 
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => router.push("/researcher/add-posting")}
+              onClick={() => router.push("/researcher/postings/new")}
               className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
             >
               Add a posting
@@ -159,15 +186,21 @@ export default function ResearcherPostingsPage() {
         </CardHeader>
         <CardContent>
           <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={queryText}
+            onChange={(e) => setQueryText(e.target.value)}
             placeholder="Search by title, institution, or tags…"
             className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
           />
         </CardContent>
       </Card>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-neutral-body">Loading…</p>
+          </CardContent>
+        </Card>
+      ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="space-y-3 pt-6">
             <p className="text-sm text-neutral-body">
@@ -179,7 +212,6 @@ export default function ResearcherPostingsPage() {
             >
               Create your first posting
             </Link>
-
           </CardContent>
         </Card>
       ) : (
@@ -233,7 +265,7 @@ export default function ResearcherPostingsPage() {
                     onClick={() => removePosting(p.id)}
                     className="w-full rounded-2xl bg-secondary px-4 py-3 text-sm font-semibold text-ink shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
                   >
-                    Delete (local)
+                    Delete
                   </button>
                 </div>
               </CardContent>
