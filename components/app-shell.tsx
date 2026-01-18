@@ -6,10 +6,12 @@ import {
   BookOpenCheck,
   Handshake,
   LifeBuoy,
+  MessageSquareHeart,
   Settings,
   Sparkles,
   User,
   NotebookText,
+  Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
@@ -36,7 +38,10 @@ const navItems: NavItem[] = [
   { href: "/", label: "Journal", Icon: BookOpenCheck },
   { href: "/insights", label: "Insights", Icon: Sparkles },
   { href: "/connect", label: "Connect", Icon: Handshake },
+  { href: "/share", label: "Share an Experience", Icon: MessageSquareHeart}
   { href: "/entries", label: "Your Entries", Icon: NotebookText},
+  { href: "/recommendations", label: "Research Recommendations", Icon: Search},
+
 ];
  
 const footerItems: NavItem[] = [
@@ -136,6 +141,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
       router.replace("/auth/login");
     }
   }, [loading, user, isAuthRoute, router]);
+
+  const isAuthRoute = pathname === "/login" || pathname === "/signup";
 
   const activeLabel = useMemo(() => {
     const match = navItems.find((item) => isActive(pathname, item.href));
