@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase/client";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 function parseTags(raw: string) {
