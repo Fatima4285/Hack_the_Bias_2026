@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase/client"; // make sure this points to your firebase.ts file
+import { db } from "@/lib/firebase/client";
+import { getAuth } from "firebase/auth";
 
 
 
@@ -40,6 +41,8 @@ export default function ShareExperiencePage() {
 const [ageType, setAgeType] = useState(""); // "range" | "exact"
 const [ageRange, setAgeRange] = useState("");
 const [ageExact, setAgeExact] = useState("");
+const auth = getAuth();
+const currentUser = auth.currentUser;
 
   function toggleSymptom(symptom: string) {
     setSymptoms((prev) =>
@@ -69,6 +72,7 @@ const [ageExact, setAgeExact] = useState("");
         misunderstood,
         notes,
         createdAt: serverTimestamp(),
+        userId: currentUser ? currentUser.uid : null,
         });
 
         setSubmitted(true);
