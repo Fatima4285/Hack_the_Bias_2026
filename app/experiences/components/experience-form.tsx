@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase/client"; // make sure this points to your firebase.ts file
-
-
+import { db } from "@/lib/firebase/client";
 
 const symptomOptions = [
   "Executive dysfunction",
@@ -29,7 +27,7 @@ const aboutOptions = [
   "Prefer not to say",
 ];
 
-export default function ShareExperiencePage() {
+export function ExperienceForm({ onSuccess }: { onSuccess?: () => void }) {
   const [about, setAbout] = useState("");
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [emotionRegulation, setEmotionRegulation] = useState("");
@@ -37,88 +35,79 @@ export default function ShareExperiencePage() {
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [title, setTitle] = useState("");
-const [ageType, setAgeType] = useState(""); // "range" | "exact"
-const [ageRange, setAgeRange] = useState("");
-const [ageExact, setAgeExact] = useState("");
+  const [ageType, setAgeType] = useState(""); // "range" | "exact"
+  const [ageRange, setAgeRange] = useState("");
+  const [ageExact, setAgeExact] = useState("");
 
   function toggleSymptom(symptom: string) {
     setSymptoms((prev) =>
       prev.includes(symptom)
         ? prev.filter((s) => s !== symptom)
-        : [...prev, symptom]
+        : [...prev, symptom],
     );
   }
 
   async function onSubmit() {
     if (!about || symptoms.length === 0) {
-        alert("Please fill out at least who this is about and select symptoms.");
-        return;
+      alert("Please fill out at least who this is about and select symptoms.");
+      return;
     }
     try {
-        await addDoc(collection(db, "experiences"), {
+      await addDoc(collection(db, "experiences"), {
         title,
         about,
         age:
-            ageType === "exact"
+          ageType === "exact"
             ? ageExact
             : ageType === "range"
-            ? ageRange
-            : "prefer-not-to-say",
+              ? ageRange
+              : "prefer-not-to-say",
         symptoms,
         emotionRegulation,
         misunderstood,
         notes,
         createdAt: serverTimestamp(),
-        });
+      });
 
-        setSubmitted(true);
+      setSubmitted(true);
 
-        // optional: clear form
-        setTitle("");
-        setAbout("");
-        setAgeType("");
-        setAgeRange("");
-        setAgeExact("");
-        setSymptoms([]);
-        setEmotionRegulation("");
-        setMisunderstood("");
-        setNotes("");
+      // optional: clear form
+      setTitle("");
+      setAbout("");
+      setAgeType("");
+      setAgeRange("");
+      setAgeExact("");
+      setSymptoms([]);
+      setEmotionRegulation("");
+      setMisunderstood("");
+      setNotes("");
+      
+      if (onSuccess) onSuccess();
     } catch (error) {
-        console.error("Error saving experience:", error);
+      console.error("Error saving experience:", error);
     }
-    }
-
+  }
 
   return (
     <div className="space-y-5">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
-          Share Your Experience
-        </h1>
-        <p className="text-sm text-neutral-body">
-          You don’t need a diagnosis. Your experience matters.
-        </p>
-      </header>
-
-    {/* Title */}
-    <Card>
-    <CardHeader>
-        <CardTitle>Give this experience a title</CardTitle>
-        <p className="text-xs text-neutral-body">
-        Optional — a short phrase that captures the experience
-        </p>
-    </CardHeader>
-    <CardContent>
-        <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="e.g. Burnout that never went away"
-        className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
-        />
-    </CardContent>
-    </Card>
-
+      {/* Title */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Give this experience a title</CardTitle>
+          <p className="text-xs text-neutral-body">
+            Optional — a short phrase that captures the experience
+          </p>
+        </CardHeader>
+        <CardContent>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Burnout that never went away"
+            className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
+          />
+        </CardContent>
+      </Card>
 
       {/* Who is this about */}
       <Card>
@@ -139,74 +128,70 @@ const [ageExact, setAgeExact] = useState("");
         </CardContent>
       </Card>
 
-        {/* Age */}
-<Card>
-  <CardHeader>
-    <CardTitle>Age</CardTitle>
-    <p className="text-xs text-neutral-body">
-      You can choose a range or enter an exact age
-    </p>
-  </CardHeader>
-  <CardContent className="space-y-3">
-    {/* Age type selector */}
-    <select
-      value={ageType}
-      onChange={(e) => {
-        setAgeType(e.target.value);
-        setAgeRange("");
-        setAgeExact("");
-      }}
-      className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
-    >
-      <option value="">Select one</option>
-      <option value="range">Age range</option>
-      <option value="exact">Exact age</option>
-      <option value="prefer-not">Prefer not to say</option>
-    </select>
+      {/* Age */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Age</CardTitle>
+          <p className="text-xs text-neutral-body">
+            You can choose a range or enter an exact age
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Age type selector */}
+          <select
+            value={ageType}
+            onChange={(e) => {
+              setAgeType(e.target.value);
+              setAgeRange("");
+              setAgeExact("");
+            }}
+            className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
+          >
+            <option value="">Select one</option>
+            <option value="range">Age range</option>
+            <option value="exact">Exact age</option>
+            <option value="prefer-not">Prefer not to say</option>
+          </select>
 
-    {/* Age range */}
-    {ageType === "range" && (
-      <select
-        value={ageRange}
-        onChange={(e) => setAgeRange(e.target.value)}
-        className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
-      >
-        <option value="">Select age range</option>
-        <option value="under-12">Under 12</option>
-        <option value="13-17">13–17</option>
-        <option value="18-24">18–24</option>
-        <option value="25-34">25–34</option>
-        <option value="35-44">35–44</option>
-        <option value="45-54">45–54</option>
-        <option value="55-64">55–64</option>
-        <option value="65+">65+</option>
-      </select>
-    )}
+          {/* Age range */}
+          {ageType === "range" && (
+            <select
+              value={ageRange}
+              onChange={(e) => setAgeRange(e.target.value)}
+              className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
+            >
+              <option value="">Select age range</option>
+              <option value="under-12">Under 12</option>
+              <option value="13-17">13–17</option>
+              <option value="18-24">18–24</option>
+              <option value="25-34">25–34</option>
+              <option value="35-44">35–44</option>
+              <option value="45-54">45–54</option>
+              <option value="55-64">55–64</option>
+              <option value="65+">65+</option>
+            </select>
+          )}
 
-    {/* Exact age */}
-    {ageType === "exact" && (
-      <input
-        type="number"
-        min={0}
-        max={120}
-        value={ageExact}
-        onChange={(e) => setAgeExact(e.target.value)}
-        placeholder="Enter age"
-        className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
-      />
-    )}
-  </CardContent>
-</Card>
-
-
+          {/* Exact age */}
+          {ageType === "exact" && (
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={ageExact}
+              onChange={(e) => setAgeExact(e.target.value)}
+              placeholder="Enter age"
+              className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Symptoms */}
       <Card>
         <CardHeader>
           <CardTitle>What symptoms are present?</CardTitle>
-          <p className="text-xs text-neutral-body">
-            Select all that apply
-          </p>
+          <p className="text-xs text-neutral-body">Select all that apply</p>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -271,26 +256,6 @@ const [ageExact, setAgeExact] = useState("");
             <option value="by-family">Yes, by family or friends</option>
             <option value="both">Yes, by both</option>
             <option value="no">No</option>
-          </select>
-        </CardContent>
-      </Card>
-
-    {/* Emotional regulation */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Does it interfere with daily life?</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <select
-            value={emotionRegulation}
-            onChange={(e) => setEmotionRegulation(e.target.value)}
-            className="w-full rounded-2xl border border-black/10 bg-white p-3 text-sm text-ink shadow-sm focus:ring-2 focus:ring-primary/60"
-          >
-            <option value="">Choose an option</option>
-            <option value="often">Often</option>
-            <option value="sometimes">Sometimes</option>
-            <option value="rarely">Rarely</option>
-            <option value="not-sure">Not sure</option>
           </select>
         </CardContent>
       </Card>

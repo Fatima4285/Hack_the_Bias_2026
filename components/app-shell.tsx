@@ -41,8 +41,7 @@ type NavItem = {
 
 const participantNavItems: NavItem[] = [
   { href: "/", label: "Journal", Icon: BookOpenCheck },
-  { href: "/share", label: "Experience", Icon: MessageSquareHeart},
-  { href: "/entries", label: "Your Entries", Icon: NotebookText},
+  { href: "/experiences", label: "Your Experiences", Icon: NotebookText},
   { href: "/insights", label: "Insights", Icon: Sparkles },
 ];
 
