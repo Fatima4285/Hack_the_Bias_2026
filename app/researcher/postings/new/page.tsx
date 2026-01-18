@@ -3,6 +3,41 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { db } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+
+function parseTags(raw: string) {
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function normalizeDraft(draft: PostingDraft) {
+  return {
+    title: draft.title.trim(),
+    institution: draft.institution.trim(),
+    studyType: draft.studyType,
+    participationMode: draft.participationMode,
+    location: draft.participationMode === "remote" ? "" : draft.location.trim(),
+
+    description: draft.description.trim(),
+    lookingFor: draft.lookingFor.trim(),
+    incentives: draft.incentives.trim(),
+
+    anonymousAllowed: draft.anonymousAllowed,
+    requiresConsent: draft.requiresConsent,
+
+    tags: parseTags(draft.tags),
+
+    status: "published" as const,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+
 
 type StudyType = "survey" | "interview" | "diary" | "focus-group" | "mixed" | "other";
 type ParticipationMode = "remote" | "in-person" | "hybrid";
@@ -142,12 +177,23 @@ export default function AddPostingPage() {
   }
 
   async function publishStub() {
-    // Later: replace with API call to your backend (DynamoDB, etc.)
-    // await fetch("/api/research/postings", { method: "POST", body: JSON.stringify(draft) })
-    saveDraftLocal();
-    setStatus("published");
-    router.push("/researcher");
+    if (!canPublish) return;
+  
+    try {
+      // Create document in Firestore collection "experiences"
+      await addDoc(collection(db, "experiences"), normalizeDraft(draft));
+  
+      setStatus("published");
+  
+      // send them somewhere sensible after publish:
+      router.push("/researcher/postings/mine"); // keep your existing route style
+    } catch (e) {
+      console.error(e);
+      setStatus("idle");
+      // optional: show error UI later
+    }
   }
+  
 
   return (
     <div className="space-y-6">
