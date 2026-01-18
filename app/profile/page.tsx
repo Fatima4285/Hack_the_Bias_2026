@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 export default function ProfilePage() {
   const { user, role, loading } = useAuth();
   const [institutionEmail, setInstitutionEmail] = useState("");
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -22,6 +23,9 @@ export default function ProfilePage() {
           const data = snap.data();
           if (data.institutionEmail) {
             setInstitutionEmail(data.institutionEmail);
+          }
+          if (data.description) {
+            setDescription(data.description);
           }
         }
       });
@@ -36,6 +40,7 @@ export default function ProfilePage() {
     try {
       await updateDoc(doc(db, "users", user.uid), {
         institutionEmail: institutionEmail.trim(),
+        description: description.trim(),
       });
       setMessage("Profile updated successfully.");
     } catch (e) {
@@ -62,18 +67,35 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
           {role === "researcher" && (
-             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-neutral-body">
-                Institution Email
-              </label>
-              <input
-                value={institutionEmail}
-                onChange={(e) => setInstitutionEmail(e.target.value)}
-                type="email"
-                placeholder="name@university.edu"
-                className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
-              />
-              <p className="text-xs text-neutral-body">Required for researcher verification.</p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-neutral-body">
+                  Institution Email
+                </label>
+                <input
+                  value={institutionEmail}
+                  onChange={(e) => setInstitutionEmail(e.target.value)}
+                  type="email"
+                  placeholder="name@university.edu"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
+                />
+                <p className="text-xs text-neutral-body">
+                  Required for researcher verification.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-neutral-body">
+                  About Me / Research Interests
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Share a bit about your research background..."
+                  className="w-full resize-none rounded-2xl border border-black/10 bg-white p-4 text-sm leading-6 text-ink shadow-sm outline-none transition placeholder:text-neutral-body focus:ring-2 focus:ring-primary/60"
+                />
+              </div>
             </div>
           )}
           
