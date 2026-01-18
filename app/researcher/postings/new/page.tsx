@@ -367,7 +367,7 @@ export default function AddPostingPage() {
                   onClick={saveDraftLocal}
                   className="w-full rounded-2xl bg-secondary px-5 py-4 text-base font-semibold text-ink shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary/60"
                 >
-                  Save draft (local)
+                  Save draft 
                 </button>
                 <button
                   type="button"
@@ -388,7 +388,7 @@ export default function AddPostingPage() {
                 <p className="text-center text-xs font-medium text-accent">Draft saved locally.</p>
               ) : (
                 <p className="text-center text-xs text-neutral-body">
-                  Not connected to a database yet.
+                  
                 </p>
               )}
             </CardContent>
