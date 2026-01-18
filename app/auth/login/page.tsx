@@ -140,7 +140,7 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <p className="text-xs font-semibold text-neutral-body">NeuroLens</p>
+        <p className="text-xs font-semibold text-neutral-body">Miss NeuroVerse</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Welcome back
         </h1>
