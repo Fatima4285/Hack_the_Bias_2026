@@ -48,10 +48,7 @@ export function ResearchFeed() {
     <section className="space-y-4" aria-label="Expert research">
       <Card className="bg-secondary">
         <CardHeader>
-          <CardTitle>Tailored for You</CardTitle>
-          <CardDescription>
-            Based on what you track — you can refine this later.
-          </CardDescription>
+          <CardTitle>Suggested for You</CardTitle>
         </CardHeader>
       </Card>
 

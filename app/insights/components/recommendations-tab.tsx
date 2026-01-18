@@ -169,7 +169,7 @@ export function RecommendationsTab() {
     <div className="space-y-4">
       <Card className="bg-secondary/50 border-none">
         <CardContent className="pt-4 flex gap-3 text-sm text-neutral-body">
-          <span className="shrink-0 bg-primary/10 p-1 rounded-full text-primary">
+          <span className="shrink-0 p-1 rounded-full text-primary">
             ℹ️
           </span>
           <p>
