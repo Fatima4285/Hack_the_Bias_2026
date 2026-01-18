@@ -22,9 +22,6 @@ export default function InsightsPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Insights Hub
         </h1>
-        <p className="text-sm text-neutral-body">
-          Calm, relevant reading — grounded in lived experience.
-        </p>
       </header>
 
       <div className="flex rounded-2xl bg-secondary p-1">
