@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpenCheck,
   Handshake,
@@ -10,9 +10,12 @@ import {
   Settings,
   Sparkles,
   User,
+  NotebookText,
+  Search,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useAuth } from "@/components/auth-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -35,9 +38,11 @@ const navItems: NavItem[] = [
   { href: "/", label: "Journal", Icon: BookOpenCheck },
   { href: "/insights", label: "Insights", Icon: Sparkles },
   { href: "/connect", label: "Connect", Icon: Handshake },
-  { href: "/share", label: "Share an Experience", Icon: MessageSquareHeart}
+  { href: "/share", label: "Share an Experience", Icon: MessageSquareHeart},
+  { href: "/entries", label: "Your Entries", Icon: NotebookText},
+  { href: "/recommendations", label: "Research Recommendations", Icon: Search},
 ];
-
+ 
 const footerItems: NavItem[] = [
   { href: "/profile", label: "Profile", Icon: User },
   { href: "/settings", label: "Settings", Icon: Settings },
@@ -63,7 +68,7 @@ function AppSidebar() {
               "truncate text-sm font-semibold text-ink" + (!open ? " sr-only" : "")
             }
           >
-            NeuroLens
+            Miss Neuroverse
           </p>
         </div>
         <SidebarTrigger />
@@ -125,8 +130,16 @@ function AppSidebar() {
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading } = useAuth();
 
-  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  const isAuthRoute = pathname === "/auth/login" || pathname === "/auth/signup";
+
+  useEffect(() => {
+    if (!loading && !user && !isAuthRoute) {
+      router.replace("/auth/login");
+    }
+  }, [loading, user, isAuthRoute, router]);
 
   const activeLabel = useMemo(() => {
     const match = navItems.find((item) => isActive(pathname, item.href));
@@ -141,6 +154,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
     );
+  }
+
+  if (loading || !user) {
+    return null;
   }
 
   return (
