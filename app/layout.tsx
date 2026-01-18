@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "NeuroLens",
+  title: "Miss Neuroverse",
   description:
     "A calm, neuro-inclusive MVP for symptom tracking, insights, and research connection.",
 };

@@ -9,6 +9,7 @@ import {
   Settings,
   Sparkles,
   User,
+  NotebookText,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
@@ -35,8 +36,9 @@ const navItems: NavItem[] = [
   { href: "/", label: "Journal", Icon: BookOpenCheck },
   { href: "/insights", label: "Insights", Icon: Sparkles },
   { href: "/connect", label: "Connect", Icon: Handshake },
+  { href: "/entries", label: "Your Entries", Icon: NotebookText},
 ];
-
+ 
 const footerItems: NavItem[] = [
   { href: "/profile", label: "Profile", Icon: User },
   { href: "/settings", label: "Settings", Icon: Settings },
@@ -62,7 +64,7 @@ function AppSidebar() {
               "truncate text-sm font-semibold text-ink" + (!open ? " sr-only" : "")
             }
           >
-            NeuroLens
+            Miss Neuroverse
           </p>
         </div>
         <SidebarTrigger />
