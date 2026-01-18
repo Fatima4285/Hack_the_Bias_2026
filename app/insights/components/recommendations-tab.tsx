@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { db } from "@/lib/firebase/client";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
 
 type Study = {
   id: string;
@@ -17,50 +21,103 @@ type Study = {
   purpose: string[];
   involves: string[];
   ethicsNote?: string;
+  isActive?: boolean;
 };
-
-const STUDIES: Study[] = [
-  {
-    id: "uoft-womens-health-fatigue",
-    org: "University of Toronto",
-    title: "Women’s Health Study",
-    hook: "Looking for people with long-term fatigue and dismissal experiences.",
-    purpose: [
-      "Understand how long-term fatigue affects daily life and care experiences.",
-      "Identify patterns in dismissal or delayed support to inform better clinical pathways.",
-    ],
-    involves: [
-      "A short eligibility screener (2–3 minutes).",
-      "One survey (10–15 minutes).",
-      "Optional interview (30–45 minutes) conducted online.",
-    ],
-    ethicsNote:
-      "This study is conducted under institutional ethics review. You’ll see the research team’s details and consent form before sharing any information.",
-  },
-];
 
 type RecView = "feed" | "details" | "apply";
 type RecTabKey = "recommended" | "applied";
 
+const SKIPPED_KEY = "neuroverse.skippedStudies";
+const APPLIED_KEY = "neuroverse.appliedStudies";
+
+
 export function RecommendationsTab() {
   const [tab, setTab] = useState<RecTabKey>("recommended");
-  const [skippedIds, setSkippedIds] = useState<Record<string, boolean>>({});
-  const [appliedIds, setAppliedIds] = useState<Record<string, boolean>>({});
+  const [skippedIds, setSkippedIds] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem(SKIPPED_KEY) ?? "{}"); } catch { return {}; }
+  });
+  
+  const [appliedIds, setAppliedIds] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem(APPLIED_KEY) ?? "{}"); } catch { return {}; }
+  });  
   const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
   const [view, setView] = useState<RecView>("feed");
   const [policyOpen, setPolicyOpen] = useState(true);
 
+  // fetched studies
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [loadingStudies, setLoadingStudies] = useState(true);
+
+  const [studiesError, setStudiesError] = useState<string | null>(null);
+  useEffect(() => {
+    try { localStorage.setItem(SKIPPED_KEY, JSON.stringify(skippedIds)); } catch {}
+  }, [skippedIds]);
+  
+  useEffect(() => {
+    try { localStorage.setItem(APPLIED_KEY, JSON.stringify(appliedIds)); } catch {}
+  }, [appliedIds]);
+  
+
+  // replace this with Firebase Auth later
+  const userId = "mock-user-123";
+
+  // READ: fetch studies from Firestore
+  useEffect(() => {
+    (async () => {
+      try {
+        setStudiesError(null);
+        setLoadingStudies(true);
+
+        const q = query(
+          collection(db, "studies"),
+          where("isActive", "==", true)
+        );
+
+        const snap = await getDocs(q);
+        const rows = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Study, "id">),
+        }));
+
+        rows.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
+        setStudies(rows);
+        // stable order (Firestore doesn't guarantee order without orderBy)
+        rows.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
+
+        setStudies(rows);
+      } catch (e: any) {
+        setStudiesError(e?.message ?? "Failed to load studies.");
+      } finally {
+        setLoadingStudies(false);
+      }
+    })();
+  }, []);
+
+  async function writeApplication(studyId: string) {
+    console.log("START write", studyId);
+    const ref = await addDoc(collection(db, "applications"), {
+      userId,
+      studyId,
+      createdAt: serverTimestamp(),
+      consentedToShareContact: true,
+      status: "submitted",
+    });
+    console.log("DONE write", ref.id);
+  }
+
   const selectedStudy = useMemo(() => {
-    return STUDIES.find((s) => s.id === selectedStudyId) ?? null;
-  }, [selectedStudyId]);
+    return studies.find((s) => s.id === selectedStudyId) ?? null;
+  }, [studies, selectedStudyId]);
 
   const recommendedStudies = useMemo(() => {
-    return STUDIES.filter((s) => !skippedIds[s.id] && !appliedIds[s.id]);
-  }, [skippedIds, appliedIds]);
+    return studies.filter((s) => !skippedIds[s.id] && !appliedIds[s.id]);
+  }, [studies, skippedIds, appliedIds]);
 
   const appliedStudies = useMemo(() => {
-    return STUDIES.filter((s) => !!appliedIds[s.id]);
-  }, [appliedIds]);
+    return studies.filter((s) => !!appliedIds[s.id]);
+  }, [studies, appliedIds]);
 
   function onLearnMore(studyId: string) {
     setSelectedStudyId(studyId);
@@ -76,34 +133,67 @@ export function RecommendationsTab() {
     setPolicyOpen(true);
   }
 
-  function onAgreeAndShare() {
+  async function onAgreeAndShare() {
     if (!selectedStudyId) return;
-    setAppliedIds((prev) => ({ ...prev, [selectedStudyId]: true }));
-    setView("feed");
-    setSelectedStudyId(null);
-    setTab("applied");
+
+    try {
+      // write application to Firestore after explicit consent
+      await writeApplication(selectedStudyId);
+
+      // UI updates
+      setAppliedIds((prev) => ({ ...prev, [selectedStudyId]: true }));
+      setView("feed");
+      setSelectedStudyId(null);
+      setTab("applied");
+    } catch (e: any) {
+      alert(e?.message ?? "Could not submit your application. Please try again.");
+    }
   }
 
   const feedStudies = tab === "recommended" ? recommendedStudies : appliedStudies;
 
   return (
     <div className="space-y-4">
-       <Card className="bg-secondary/50 border-none">
-          <CardContent className="pt-4 flex gap-3 text-sm text-neutral-body">
-            <span className="shrink-0 bg-primary/10 p-1 rounded-full text-primary">ℹ️</span>
-            <p>
-              Match with active research studies looking for participants like you. 
-              You’ll only be connected if you explicitly agree to share your contact info.
-            </p>
+      <Card className="bg-secondary/50 border-none">
+        <CardContent className="pt-4 flex gap-3 text-sm text-neutral-body">
+          <span className="shrink-0 bg-primary/10 p-1 rounded-full text-primary">
+            ℹ️
+          </span>
+          <p>
+            Match with active research studies looking for participants like you.
+            You’ll only be connected if you explicitly agree to share your
+            contact info.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Loading / error */}
+      {loadingStudies && (
+        <Card>
+          <CardContent className="py-4 text-sm text-neutral-body">
+            Loading studies…
           </CardContent>
-       </Card>
+        </Card>
+      )}
+
+      {studiesError && (
+        <Card>
+          <CardContent className="py-4 text-sm text-red-600">
+            {studiesError}
+          </CardContent>
+        </Card>
+      )}
 
       {/* TABS */}
-      {view === "feed" && (
+      {!loadingStudies && !studiesError && view === "feed" && (
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-base">{tab === "recommended" ? "Recommended studies" : "Applied research"}</CardTitle>
+              <CardTitle className="text-base">
+                {tab === "recommended"
+                  ? "Recommended studies"
+                  : "Applied research"}
+              </CardTitle>
 
               <div className="flex gap-2">
                 <button
@@ -111,7 +201,9 @@ export function RecommendationsTab() {
                   onClick={() => setTab("recommended")}
                   className={
                     "rounded-full px-4 py-2 text-xs font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60 " +
-                    (tab === "recommended" ? "bg-primary text-white" : "bg-white text-ink hover:bg-secondary")
+                    (tab === "recommended"
+                      ? "bg-primary text-white"
+                      : "bg-white text-ink hover:bg-secondary")
                   }
                   aria-pressed={tab === "recommended"}
                 >
@@ -122,7 +214,9 @@ export function RecommendationsTab() {
                   onClick={() => setTab("applied")}
                   className={
                     "rounded-full px-4 py-2 text-xs font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/60 " +
-                    (tab === "applied" ? "bg-primary text-white" : "bg-white text-ink hover:bg-secondary")
+                    (tab === "applied"
+                      ? "bg-primary text-white"
+                      : "bg-white text-ink hover:bg-secondary")
                   }
                   aria-pressed={tab === "applied"}
                 >
@@ -149,9 +243,15 @@ export function RecommendationsTab() {
                       className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm transition hover:bg-secondary"
                     >
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-neutral-body">{s.org}</p>
-                        <p className="text-sm font-semibold text-ink">{s.title}</p>
-                        <p className="text-sm leading-6 text-neutral-body">“{s.hook}”</p>
+                        <p className="text-xs font-semibold text-neutral-body">
+                          {s.org}
+                        </p>
+                        <p className="text-sm font-semibold text-ink">
+                          {s.title}
+                        </p>
+                        <p className="text-sm leading-6 text-neutral-body">
+                          “{s.hook}”
+                        </p>
 
                         {isApplied && (
                           <p className="mt-2 inline-flex w-fit rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-ink">
@@ -194,7 +294,7 @@ export function RecommendationsTab() {
       )}
 
       {/* DETAILS */}
-      {view === "details" && selectedStudy && (
+      {!loadingStudies && !studiesError && view === "details" && selectedStudy && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>
@@ -203,12 +303,18 @@ export function RecommendationsTab() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-2xl border border-black/10 bg-white p-4">
-              <p className="text-xs font-semibold text-neutral-body">Study summary</p>
-              <p className="mt-1 text-sm leading-6 text-ink">“{selectedStudy.hook}”</p>
+              <p className="text-xs font-semibold text-neutral-body">
+                Study summary
+              </p>
+              <p className="mt-1 text-sm leading-6 text-ink">
+                “{selectedStudy.hook}”
+              </p>
             </div>
 
             <div className="rounded-2xl border border-black/10 bg-white p-4">
-              <p className="text-xs font-semibold text-neutral-body">Purpose of the study</p>
+              <p className="text-xs font-semibold text-neutral-body">
+                Purpose of the study
+              </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-ink">
                 {selectedStudy.purpose.map((p, i) => (
                   <li key={i}>{p}</li>
@@ -217,7 +323,9 @@ export function RecommendationsTab() {
             </div>
 
             <div className="rounded-2xl border border-black/10 bg-white p-4">
-              <p className="text-xs font-semibold text-neutral-body">What participation involves</p>
+              <p className="text-xs font-semibold text-neutral-body">
+                What participation involves
+              </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-ink">
                 {selectedStudy.involves.map((p, i) => (
                   <li key={i}>{p}</li>
@@ -226,7 +334,9 @@ export function RecommendationsTab() {
             </div>
 
             {selectedStudy.ethicsNote && (
-              <p className="text-sm leading-6 text-neutral-body">{selectedStudy.ethicsNote}</p>
+              <p className="text-sm leading-6 text-neutral-body">
+                {selectedStudy.ethicsNote}
+              </p>
             )}
 
             <div className="flex gap-2">
@@ -268,7 +378,7 @@ export function RecommendationsTab() {
       )}
 
       {/* APPLY / CONSENT */}
-      {view === "apply" && selectedStudy && (
+      {!loadingStudies && !studiesError && view === "apply" && selectedStudy && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>Apply — {selectedStudy.org}</CardTitle>
@@ -277,8 +387,9 @@ export function RecommendationsTab() {
           <CardContent className="space-y-4">
             <div className="rounded-2xl border border-black/10 bg-white p-4">
               <p className="text-sm font-semibold text-ink">
-                By continuing, you agree to share your contact information with this research team so they can reach out
-                to you about participating in their study.
+                By continuing, you agree to share your contact information with
+                this research team so they can reach out to you about
+                participating in their study.
               </p>
 
               <button
@@ -289,20 +400,27 @@ export function RecommendationsTab() {
                 aria-controls="policy-panel"
               >
                 {policyOpen ? "Collapse details" : "Expand details"}
-                {policyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {policyOpen ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
               </button>
 
               {policyOpen && (
                 <div id="policy-panel" className="mt-3 space-y-3">
                   <p className="text-sm leading-6 text-neutral-body">
-                    If you participate, your experience and any data you provide will be shared with the research team for
-                    the purpose of this study only, in the way described on the previous screen (for example, surveys,
-                    interviews, or clinical research). Your information will be handled according to their ethics approval
-                    and privacy policies.
+                    If you participate, your experience and any data you provide
+                    will be shared with the research team for the purpose of
+                    this study only, in the way described on the previous screen
+                    (for example, surveys, interviews, or clinical research).
+                    Your information will be handled according to their ethics
+                    approval and privacy policies.
                   </p>
                   <p className="text-sm leading-6 text-neutral-body">
-                    Participation is completely voluntary. You can decline now or withdraw later without any penalty.
-                    Your decision will not affect your ability to use this app.
+                    Participation is completely voluntary. You can decline now
+                    or withdraw later without any penalty. Your decision will
+                    not affect your ability to use this app.
                   </p>
                 </div>
               )}
